@@ -2868,3 +2868,731 @@ chmod +x scripts/deploy_full_secure.sh
 ./scripts/deploy_full_secure.sh
 
 
+npm ci --production --strict --ignore-scripts --audit
+
+
+# ==================== BUILD STAGE ====================
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --production --strict --ignore-scripts
+
+COPY . .
+
+# ==================== PRODUCTION STAGE ====================
+FROM node:20-alpine
+WORKDIR /app
+
+# Non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nodejs
+USER nodejs
+
+# Copy only necessary files from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/index.js ./
+COPY --from=builder /app/fluent-bit.conf ./  # if used
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "index.js"]
+
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --strict
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nodejs
+USER nodejs
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./
+EXPOSE 3000
+CMD ["npm", "start"]
+
+
+{
+  "name": "church-of-pump",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "church-of-pump",
+      "version": "1.0.0",
+      "dependencies": {
+        "@noble/curves": "^1.7.0",
+        "@noble/hashes": "^1.5.0",
+        "@solana/wallet-adapter-react": "^0.15.35",
+        "@solana/wallet-adapter-wallets": "^0.19.32",
+        "@solana/web3.js": "^1.95.0",
+        "axios": "^1.7.2",
+        "express": "^4.19.2",
+        "next": "14.2.5",
+        "prom-client": "^15.1.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "tailwindcss": "^3.4.1",
+        "zod": "^3.23.8"
+      }
+    }
+  }
+}
+
+
+
+cd /home/workdir/artifacts
+npm ci --production --strict
+
+
+
+echo "🔒 Locking dependencies with strict mode..."
+cd /home/workdir/artifacts
+npm ci --production --strict --ignore-scripts --audit
+
+cd programs/pump_rewards
+cargo generate-lockfile
+cargo audit || echo "⚠️ Review Cargo audit before mainnet"
+
+echo "✅ Strict dependency locking + security audit complete"
+
+
+npm ci --production --strict --ignore-scripts --audit --prefer-offline
+
+
+# ==================== BUILD STAGE (Layer Caching Optimized) ====================
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy only package files first → maximize layer cache
+COPY package*.json ./
+RUN npm ci --production --strict --ignore-scripts --prefer-offline
+
+# Copy source after dependencies (cache hit on deps)
+COPY . .
+
+# ==================== PRODUCTION STAGE ====================
+FROM node:20-alpine
+WORKDIR /app
+
+# Security hardening
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nodejs
+USER nodejs
+
+# Copy only necessary artifacts (layer cache friendly)
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/package.json ./
+COPY --from=builder --chown=node:node /app/index.js ./
+COPY --from=builder --chown=node:node /app/fluent-bit.conf ./ 
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "index.js"]
+
+
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+Dockerfile
+*.md
+.env
+
+docker build --pull --no-cache=false -t pump-bot:latest .
+
+
+{
+  "name": "church-of-pump",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "church-of-pump",
+      "version": "1.0.0",
+      "dependencies": {
+        "@noble/curves": "^1.7.0",
+        "@noble/hashes": "^1.5.0",
+        "@solana/wallet-adapter-react": "^0.15.35",
+        "@solana/wallet-adapter-wallets": "^0.19.32",
+        "@solana/web3.js": "^1.95.0",
+        "axios": "^1.7.2",
+        "express": "^4.19.2",
+        "next": "14.2.5",
+        "prom-client": "^15.1.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "tailwindcss": "^3.4.1",
+        "zod": "^3.23.8"
+      }
+    }
+  }
+}
+
+
+cd /home/workdir/artifacts
+rm -rf node_modules package-lock.json
+npm ci --production --strict --ignore-scripts --prefer-offline
+
+
+echo "🔒 Locking dependencies with strict mode + Docker caching..."
+cd /home/workdir/artifacts
+
+# Node.js strict lock
+npm ci --production --strict --ignore-scripts --audit --prefer-offline
+
+# Rust
+cd programs/pump_rewards
+cargo generate-lockfile
+cargo audit || echo "⚠️ Review Cargo audit before mainnet"
+
+# Docker multi-stage build with cache
+cd ../../pump-bot
+docker build --pull --no-cache=false -t pump-bot:latest .
+
+echo "✅ Strict dependencies + optimized Docker layers complete"
+
+
+#!/bin/bash
+set -euo pipefail
+
+echo "🚀 CHURCH OF PUMP — FULL MASTER DEPLOYMENT (All 2 Weeks of Work)"
+echo "================================================================="
+
+cd /home/workdir/artifacts || { echo "❌ Cannot access artifacts directory"; exit 1; }
+
+# ====================== CONFIG ======================
+export DOCKER_BUILDKIT=1
+export BUILDKIT_PROGRESS=plain
+
+# ====================== DEPENDENCY LOCKING ======================
+echo "🔒 Locking dependencies with strict mode..."
+cd /home/workdir/artifacts
+
+# Node.js - Strict + Cache
+npm ci --production --strict --ignore-scripts --audit --prefer-offline
+
+# Rust/Anchor
+cd programs/pump_rewards
+cargo generate-lockfile
+cargo audit || echo "⚠️ Review Cargo audit findings before mainnet"
+
+cd /home/workdir/artifacts
+
+# ====================== DOCKER MULTI-STAGE BUILDS ======================
+echo "🏗️  Building optimized Docker images with BuildKit cache..."
+
+# Pump Bot (Multi-stage + BuildKit cache mounts)
+docker build --pull \
+  --build-arg BUILDKIT_INLINE_CACHE=1 \
+  --cache-from type=registry,ref=yourusername/pump-bot:cache \
+  -t pump-bot:latest \
+  -f pump-bot/Dockerfile \
+  --mount=type=cache,target=/root/.npm \
+  pump-bot
+
+# Frontend (Next.js)
+docker build --pull \
+  --build-arg BUILDKIT_INLINE_CACHE=1 \
+  -t church-of-pump-frontend:latest \
+  -f church-of-pump/Dockerfile \
+  --mount=type=cache,target=/root/.npm \
+  church-of-pump
+
+echo "✅ Docker images built with BuildKit caching"
+
+# ====================== FULL DEPLOYMENT ======================
+echo "🚀 Starting services..."
+
+docker compose -f docker-compose.full.yml up -d --remove-orphans
+
+echo "✅ All services started"
+
+# ====================== FINAL COMMIT ======================
+cd /home/workdir/artifacts
+git add -A
+git commit -m "feat: final production deployment - BuildKit + GitHub Actions cache + full stack
+
+- Docker BuildKit cache mounts
+- GitHub Actions caching
+- Strict npm ci
+- GELF TCP/TLS + Loki + Prometheus + Grafana
+- Bubblegum cNFT + Geyser + Squads v4 + PQC" || echo "✅ No new changes"
+
+echo ""
+echo "🎉 CHURCH OF PUMP FULL DEPLOYMENT COMPLETE!"
+echo "================================================================="
+echo "Frontend: http://localhost:3000"
+echo "Bot:      http://localhost:3001"
+echo "Grafana:  http://localhost:3002"
+echo "Log:      $LOGFILE"
+echo ""
+echo "Security: Strict builds, BuildKit cache, verifiable Anchor, Squads timelock, PQC bridge"
+echo "Scalability: cNFT compression, Geyser real-time, Docker layer caching"
+echo ""
+echo "Ready for mainnet launch. ⛪🚀🔒"
+
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production --strict --ignore-scripts --prefer-offline
+COPY . .
+
+FROM node:20-alpine
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nodejs
+USER nodejs
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/index.js ./
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["node", "index.js"]
+
+
+name: Deploy Church of Pump
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-buildx-
+
+      - name: Deploy
+        run: ./scripts/deploy_full_master.sh
+
+
+        
+cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_master.sh
+./scripts/deploy_full_master.sh
+
+
+#!/bin/bash
+set -euo pipefail
+
+echo "🚀 CHURCH OF PUMP — FULL MASTER DEPLOYMENT"
+echo "============================================="
+
+cd /home/workdir/artifacts || { echo "❌ Missing artifacts directory"; exit 1; }
+
+export DOCKER_BUILDKIT=1
+
+# ====================== DEPENDENCY LOCKING ======================
+echo "🔒 Locking dependencies..."
+cd /home/workdir/artifacts
+npm ci --production --strict --ignore-scripts --audit --prefer-offline
+
+cd programs/pump_rewards
+cargo generate-lockfile
+cargo audit || echo "⚠️ Review Cargo audit"
+
+# ====================== DOCKER BUILDS WITH BUILDKIT CACHE ======================
+echo "🏗️ Building Docker images with BuildKit cache mounts..."
+
+# Pump Bot
+docker build --pull \
+  --build-arg BUILDKIT_INLINE_CACHE=1 \
+  --cache-from type=local,src=/tmp/.buildx-cache \
+  --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
+  -t pump-bot:latest \
+  -f pump-bot/Dockerfile \
+  pump-bot
+
+# Frontend
+docker build --pull \
+  --build-arg BUILDKIT_INLINE_CACHE=1 \
+  --cache-from type=local,src=/tmp/.buildx-cache-frontend \
+  --cache-to type=local,dest=/tmp/.buildx-cache-frontend,mode=max \
+  -t church-of-pump-frontend:latest \
+  -f church-of-pump/Dockerfile \
+  church-of-pump
+
+echo "✅ Docker builds complete with BuildKit caching"
+
+# ====================== DEPLOY ======================
+docker compose -f docker-compose.full.yml up -d --remove-orphans
+
+echo "🎉 FULL DEPLOYMENT COMPLETE!"
+echo "Frontend: http://localhost:3000"
+echo "Bot:      http://localhost:3001"
+echo "Grafana:  http://localhost:3002"
+
+
+version: '3.8'
+
+services:
+  frontend:
+    image: church-of-pump-frontend:latest
+    build:
+      context: ./church-of-pump
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_HELIUS_RPC=...
+
+  pump-bot:
+    image: pump-bot:latest
+    build:
+      context: ./pump-bot
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/config:/etc/loki
+      - loki_data:/var/loki
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./grafana:/etc/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=strongpasswordchangeinprod
+
+volumes:
+  loki_data:
+
+
+  version: '3.8'
+
+services:
+  frontend:
+    image: church-of-pump-frontend:latest
+    build:
+      context: ./church-of-pump
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_HELIUS_RPC=...
+
+  pump-bot:
+    image: pump-bot:latest
+    build:
+      context: ./pump-bot
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/config:/etc/loki
+      - loki_data:/var/loki
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./grafana:/etc/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=strongpasswordchangeinprod
+
+volumes:
+  loki_data:
+
+
+  # syntax=docker/dockerfile:1
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --production --strict --ignore-scripts --prefer-offline
+
+COPY . .
+
+FROM node:20-alpine
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nodejs
+USER nodejs
+WORKDIR /app
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/index.js ./
+COPY --from=builder /app/fluent-bit.conf ./
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "index.js"]
+
+
+# syntax=docker/dockerfile:1
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --strict --prefer-offline
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nodejs
+USER nodejs
+WORKDIR /app
+
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./
+
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "start"]
+
+
+name: Church of Pump - Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Cache Docker BuildKit
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-buildx-
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Deploy
+        run: ./scripts/deploy_full_master.sh
+
+
+        cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_master.sh
+./scripts/deploy_full_master.sh
+
+
+# ==================== CORE ====================
+NODE_ENV=production
+
+# Solana
+NEXT_PUBLIC_HELIUS_RPC=https://mainnet.helius-rpc.com/?api-key=your_helius_key_here
+HELIUS_API_KEY=your_helius_key_here
+HELIUS_WS_URL=wss://mainnet.helius-rpc.com/?api-key=your_helius_key_here
+
+# Program & Mint
+PUMP_PROGRAM_ID=YourDeployedProgramIdHere
+PUMP_TOKEN_MINT=YourToken2022MintHere
+TREASURY_PDA=YourTreasuryPDAHere
+
+# Squads v4
+SQUADS_VAULT_PUBKEY=YourSquadsMultisigVaultHere
+
+# Jito
+JITO_RPC_URL=https://mainnet.block-engine.jito.wtf
+JITO_TIP_LAMPORTS=50000
+
+# Graylog GELF
+GELF_HOST=127.0.0.1
+GELF_PORT=12201
+GELF_TRANSPORT=tcp
+GELF_USE_TLS=true
+
+# Loki
+LO
+
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+
+
+    {
+  "title": "Church of Pump - Full Monitoring Dashboard",
+  "uid": "pump-full-monitor",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "gauge",
+      "title": "Circuit Breaker Status",
+      "targets": [{ "expr": "pump_deploy_circuit_breaker_open" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Retry Rate",
+      "targets": [{ "expr": "rate(pump_deploy_retries_total[5m])" }]
+    },
+    {
+      "type": "stat",
+      "title": "Total Failures",
+      "targets": [{ "expr": "pump_deploy_failures_total" }]
+    },
+    {
+      "type": "logs",
+      "title": "Live Deployment Logs (Loki)",
+      "targets": [{
+        "expr": "{job=\"pump-deploy\"}",
+        "legendFormat": "Deploy Logs"
+      }]
+    }
+  ]
+}
+
+
+apiVersion: 1
+providers:
+  - name: 'default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+
+
+    #!/bin/bash
+set -euo pipefail
+
+echo "🚀 CHURCH OF PUMP — FULL MASTER DEPLOYMENT"
+echo "============================================="
+
+cd /home/workdir/artifacts || { echo "❌ Cannot access /home/workdir/artifacts"; exit 1; }
+
+export DOCKER_BUILDKIT=1
+
+# ====================== 1. DEPENDENCY LOCKING ======================
+echo "🔒 Locking dependencies with strict mode..."
+cd /home/workdir/artifacts
+
+npm ci --production --strict --ignore-scripts --audit --prefer-offline
+
+cd programs/pump_rewards
+cargo generate-lockfile
+cargo audit || echo "⚠️ Review Cargo audit before mainnet"
+
+cd /home/workdir/artifacts
+
+# ====================== 2. DOCKER MULTI-STAGE BUILDS ======================
+echo "🏗️ Building optimized Docker images with BuildKit cache..."
+
+# Pump Bot
+docker build --pull \
+  --build-arg BUILDKIT_INLINE_CACHE=1 \
+  --cache-from type=local,src=/tmp/.buildx-cache \
+  --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
+  -t pump-bot:latest \
+  -f pump-bot/Dockerfile \
+  pump-bot
+
+# Frontend
+docker build --pull \
+  --build-arg BUILDKIT_INLINE_CACHE=1 \
+  --cache-from type=local,src=/tmp/.buildx-cache-frontend \
+  --cache-to type=local,dest=/tmp/.buildx-cache-frontend,mode=max \
+  -t church-of-pump-frontend:latest \
+  -f church-of-pump/Dockerfile \
+  church-of-pump
+
+echo "✅ Docker builds complete"
+
+# ====================== 3. DEPLOY SERVICES ======================
+echo "🚀 Starting full stack..."
+docker compose -f docker-compose.full.yml up -d --remove-orphans
+
+# ====================== 4. FINAL COMMIT ======================
+cd /home/workdir/artifacts
+git add -A
+git commit -m "feat: final production $PUMP deployment - Full master script
+
+- Strict npm ci + Cargo audit
+- Docker BuildKit cache mounts
+- GELF TCP/TLS + Loki + Prometheus + Grafana
+- Bubblegum cNFT + Geyser LaserStream + Squads v4
+- PQC (
+
+
+cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_master.sh
+./scripts/deploy_full_master.sh
+
+cp .env.example .env
+# Edit .env with real keys
+docker compose -f docker-compose.full.yml up -d
+
+
+
+
