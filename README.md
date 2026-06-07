@@ -2704,6 +2704,41 @@ async function loadLatticeWasm() {
 export async function generateDilithiumKeyPair() {
   const module = await load
 
+
+  
+#!/bin/bash
+set -euo pipefail
+
+echo "🚀 CHURCH OF PUMP — FULL MASTER DEPLOYMENT (All 2 Weeks of Work)"
+echo "================================================================="
+
+cd /home/workdir/artifacts || { echo "❌ Cannot access /home/workdir/artifacts"; exit 1; }
+
+# 1. Create Full Project Structure
+echo "Creating project structure..."
+mkdir -p programs/pump_rewards/src programs/pump_rewards/tests \
+         church-of-pump/app/staking church-of-pump/lib/pqc \
+         pump-bot/fluent-bit/scripts pump-bot/grafana/dashboards \
+         scripts
+
+# 2. Write All Critical Files
+
+# === ANCHOR PROGRAM (pump_rewards) ===
+cat > programs/pump_rewards/src/lib.rs << 'EOF'
+use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked};
+
+declare_id!("PumpRewards1111111111111111111111111111111111");
+
+#[program]
+pub mod pump_rewards {
+    use super::*;
+
+    // Transfer Hook with 1% tax
+
+    cd /home/workdir/artifacts
+chmod +x deploy_full_master.sh
+./deploy_full_master.sh
   
 
 
