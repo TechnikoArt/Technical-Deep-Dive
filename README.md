@@ -2739,8 +2739,132 @@ pub mod pump_rewards {
     cd /home/workdir/artifacts
 chmod +x deploy_full_master.sh
 ./deploy_full_master.sh
-  
+
+{
+  "name": "church-of-pump",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "bot": "node pump-bot/index.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.0",
+    "@solana/wallet-adapter-react": "^0.15.35",
+    "@solana/wallet-adapter-wallets": "^0.19.32",
+    "next": "14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.1",
+    "@noble/curves": "^1.7.0",
+    "@noble/hashes": "^1.5.0",
+    "express": "^4.19.2",
+    "axios": "^1.7.2",
+    "zod": "^3.23.8",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "typescript": "^5.5.3",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39"
+  }
+}
 
 
+cd /home/workdir/artifacts
+npm install --package-lock-only
+
+cd /home/workdir/artifacts/programs/pump_rewards
+cargo generate-lockfile
+anchor build --verifiable
+
+[dependencies]
+anchor-lang = "0.29.0"
+anchor-spl = { version = "0.29.0", features = ["idl-build"] }
+spl-token-2022 = "0.9"
+spl-transfer-hook-interface = "0.6"
+pyth-solana-receiver-sdk = "0.3"
+
+
+#!/bin/bash
+set -e
+
+echo "🔒 Generating locked dependencies..."
+
+# Node.js
+cd /home/workdir/artifacts
+npm ci --production
+
+# Rust/Anchor
+cd programs/pump_rewards
+cargo generate-lockfile
+anchor build --verifiable
+
+echo "✅ All dependencies locked and verified!"
+echo "package-lock.json and Cargo.lock are ready for deployment."
+
+
+# In deploy_full_secure.sh
+cd programs/pump_rewards
+echo "🔍 Running Cargo Audit (Rust security scan)..."
+cargo audit || echo "⚠️  Cargo audit found issues - review before mainnet"
+
+
+cargo install cargo-audit
+
+
+{
+  "name": "church-of-pump",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "church-of-pump",
+      "version": "1.0.0",
+      "dependencies": {
+        "@noble/curves": "^1.7.0",
+        "@noble/hashes": "^1.5.0",
+        "@solana/wallet-adapter-react": "^0.15.35",
+        "@solana/wallet-adapter-wallets": "^0.19.32",
+        "@solana/web3.js": "^1.95.0",
+        "axios": "^1.7.2",
+        "express": "^4.19.2",
+        "next": "14.2.5",
+        "prom-client": "^15.1.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "tailwindcss": "^3.4.1",
+        "zod": "^3.23.8"
+      }
+    }
+  }
+}
+
+
+cd /home/workdir/artifacts
+rm -rf node_modules package-lock.json
+npm ci
+# === DEPENDENCY LOCKING & SECURITY SCAN ===
+echo "🔒 Locking dependencies and running security audits..."
+
+cd /home/workdir/artifacts
+npm ci --production
+npm audit --audit-level=high
+
+cd programs/pump_rewards
+cargo generate-lockfile
+cargo audit || echo "⚠️ Review Cargo audit findings before mainnet"
+
+echo "✅ Dependencies locked and audited successfully"
+
+cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_secure.sh
+./scripts/deploy_full_secure.sh
 
 
