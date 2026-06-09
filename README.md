@@ -10948,7 +10948,9 @@ alter table comments enable row level security;
 create policy "Users can insert their own comments"
 on comments for insert
 with check (auth.uid() is not null);
-
+cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_master.sh
+./scripts/deploy_full_master.sh
 
 
 
