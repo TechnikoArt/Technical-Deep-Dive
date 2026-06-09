@@ -10951,6 +10951,117 @@ with check (auth.uid() is not null);
 cd /home/workdir/artifacts
 chmod +x scripts/deploy_full_master.sh
 ./scripts/deploy_full_master.sh
+const res = await fetch('/api/bridge', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    token: selectedToken.symbol,
+    amount,
+    targetChain,
+    message,
+    dilithiumSignature: dilithiumSig.signature,
+    publicKey: keyPair.publicKey
+  })
+});
+cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_master.sh
+./scripts/deploy_full_master.sh
+// Simulated Wormhole VAA structure
+interface WormholeVAA {
+  version: number;
+  guardianSetIndex: number;
+  signatures: string[];
+  timestamp: number;
+  nonce: number;
+  emitterChain: number;
+  emitterAddress: string;
+  sequence: number;
+  consistencyLevel: number;
+  payload: {
+    token: string;
+    amount: string;
+    targetChain: string;
+    recipient: string;
+    dilithiumSignature: string;
+    kyberCiphertext: string;
+  };
+}
+
+function createSimulatedVAA(token: string, amount: string, targetChain: string, dilithiumSig: string, kyberCipher: string): WormholeVAA {
+  return {
+    version: 1,
+    guardianSetIndex: 0,
+    signatures: ["simulated-guardian-sig-1", "simulated-guardian-sig-2"],
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: Date.now(),
+    emitterChain: 1, // Solana
+    emitterAddress: "ChurchOfPumpEmitterAddress",
+    sequence: Math.floor(Math.random() * 1000000),
+    consistencyLevel: 1,
+    payload: {
+      token,
+      amount,
+      targetChain,
+      recipient: "recipient-address-placeholder",
+      dilithiumSignature: dilithiumSig,
+      kyberCiphertext: kyberCipher,
+    }
+  };
+}
+// XRP-specific handling example (inside initiateBridge)
+if (selectedToken.symbol === 'XRP') {
+  // XRPL uses different address format and requires destination tag in some cases
+  console.log("XRP Bridge: Using XRPL-compatible payload");
+  // In production: Use Wormhole's XRPL integration or Axelar
+}
+if (token === 'XRP') {
+  // Additional validation for XRPL addresses
+  if (!payload.recipient.startsWith('r')) {
+    return NextResponse.json({ error: 'Invalid XRPL address' }, { status: 400 });
+  }
+}
+// Full XRP Bridge Integration (Wormhole + PQC)
+export interface XRPBridgeParams {
+  amount: string;
+  xrplAddress: string;
+  solanaRecipient: string;
+  targetChain: string;
+}
+
+export async function prepareXRPBridge(params: XRPBridgeParams, pqcSignatures: any) {
+  if (!params.xrplAddress.startsWith('r')) {
+    throw new Error('Invalid XRPL address');
+  }
+
+  const bridgePayload = {
+    token: 'XRP',
+    amount: params.amount,
+    sourceChain: 'xrpl',
+    targetChain: params.targetChain,
+    xrplAddress: params.xrplAddress,
+    solanaRecipient: params.solanaRecipient,
+    ...pqcSignatures,
+    timestamp: Date.now()
+  };
+
+  // Simulated Wormhole VAA for XRP
+  const vaa = {
+    version: 1,
+    emitterChain: 0, // XRPL
+    payload: bridgePayload,
+    guardianSignatures: ['xrp-guardian-sig-1']
+  };
+
+  return {
+    success: true,
+    vaa,
+    message: `XRP bridge prepared: ${params.amount} XRP`
+  };
+}
+cd /home/workdir/artifacts
+chmod +x scripts/deploy_full_master.sh
+./scripts/deploy_full_master.sh
+
 
 
 
